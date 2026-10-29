@@ -1,0 +1,10 @@
+__pycache__/
+build/
+*.spec
+.venv/
+dist/
+*.log
+.env
+.env.*
+LinkScope-report*.json
+LinkScope-topology*.svg

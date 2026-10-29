@@ -1,0 +1,41 @@
+LINKSCOPE LIVE - PORTABLE WINDOWS APPLICATION
+
+1. Extract the ZIP to a folder on your PC or USB drive.
+2. Double-click LinkScope.exe.
+3. Select the network adapter you want to test.
+
+No Python, command prompt, or app installation is needed.
+Supported build: Windows 10 / Windows 11, Intel or AMD 64-bit (x64).
+32-bit Windows is not supported by this executable. Windows on ARM has
+not been validated; it may run using Windows x64 emulation.
+
+INCLUDED FEATURES
+- Live adapter status, IP address, subnet mask, gateway, and DNS
+- Live gateway latency and echo packet-loss graph
+- Wi-Fi connection, signal history, channel, security, and nearby networks
+- Local subnet ARP / ping discovery, with IP and MAC addresses
+- LLDP switch and port discovery
+- Cable/link partner check (requires a physical Ethernet adapter)
+- Logical network topology with SVG image export
+- JSON report export
+
+OPTIONAL DRIVER FOR LLDP
+Install Npcap separately on each PC where you need LLDP capture:
+https://npcap.com/#download
+Restart LinkScope after installing the driver.
+If Npcap was installed with administrator-only access, run LinkScope
+as administrator. Use wired Ethernet and enable LLDP on the switch.
+
+Adapter details, Wi-Fi diagnostics, subnet discovery, and gateway tests
+work without Npcap. Windows policies, Wi-Fi location permissions, and
+firewalls can affect which diagnostic information is available.
+
+The application stays local. Reports are saved only when you select
+Export report. Subnet scans send ARP and ICMP probes to the range shown.
+Scans support up to 4,096 addresses inside the selected adapter's subnet.
+
+Cable continuity, per-wire faults, cable length, and PoE voltage are not
+measured by a standard PC adapter. An active Ethernet link indicates an
+active remote transceiver. No link cannot prove the far-end device is off.
+Topology lines show logical subnet membership and configured routing;
+physical switch-port/AP attachment paths require additional evidence.
