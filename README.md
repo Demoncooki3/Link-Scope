@@ -4,6 +4,8 @@ GitHub repository: [Demoncooki3/Link-Scope](https://github.com/Demoncooki3/Link-
 
 ## Download a Windows build
 
+For the executable, open [Releases](https://github.com/Demoncooki3/Link-Scope/releases/latest) and download **LinkScope.exe** under Assets, or use the portable ZIP. Successful builds on main automatically publish both files to a release.
+
 Open the repository's **Actions** tab, choose a successful **Windows portable build** run, and download the **LinkScope-Windows-x64** artifact. Extract the downloaded artifact and the portable ZIP inside it, then run `LinkScope.exe`. GitHub may require sign-in to download workflow artifacts. Each push runs tests and creates a new build. Older artifacts may expire; build.ps1 can reproduce the application locally.
 
 The current edition uses a lime-green and charcoal theme. The portable package is **dist/LinkScope-Hostnames-Windows-x64.zip**.
