@@ -67,3 +67,19 @@ Open Topology, select a wired or wireless adapter, choose its local IPv4 CIDR ra
 Scroll the map for larger scans. Double-click a device for connectivity tests. Save map (SVG) exports a standalone image; Export report includes structured nodes, edges, scan context, and cable/link results. A completed or stopped map retains its original adapter and range even if you select another adapter. The next scan replaces it.
 
 Discovered devices now include hostnames from reverse DNS (PTR records), using the Windows DNS configuration. Lookups have a four-second timeout. Missing names show as Hostname unavailable. The local computer uses its Windows hostname. Names appear in discovery, topology, SVG, and JSON reports. Long names are shortened on map cards; full names remain in the discovery table and device report. Run a new scan to populate names.
+
+## Nmap and traceroute
+
+The Nmap tab locates an existing nmap.exe in PATH or the normal Windows install folders. Install [Nmap for Windows](https://nmap.org/download.html) separately, then Browse if necessary. Nmap and Npcap are not bundled with LinkScope. Enter a single IPv4 address, hostname, or IPv4 CIDR range; choose Host discovery, TCP top 100 ports, or Service detection. Use selected subnet copies the current discovery range. Port profiles use TCP connect scans, skip initial host discovery, and scan up to 256 addresses; host discovery supports up to 4,096. Service detection probes services on detected ports. Results appear when complete or cancelled; Save output exports the text. An overall five-minute limit and per-host timeout bound scans. Nmap results are currently separate from the topology map.
+
+In Connectivity tests, edit Host or IP and click Traceroute. Windows tracert uses IPv4, numeric hop addresses, 30 maximum hops, and one-second probe timeouts. Stop trace cancels it. Asterisks indicate missing replies, not necessarily a broken route. Both traceroute and Nmap follow the system routing table rather than binding to the adapter selector. Reports include their commands, output, execution state, and timestamps. Command completion does not by itself prove that the destination was reached.
+
+## Roadmap for more accurate topology
+
+- Managed switches: read-only SNMPv3 access to LLDP/CDP neighbor tables, interface names, MAC forwarding tables, VLAN membership, and link aggregation. Join MACs to ports and corroborate links from both ends.
+- Routers/firewalls: read-only ARP/neighbor and route tables, plus access to each routed VLAN. A scan from one subnet cannot see every network segment.
+- Wireless: read-only controller/AP APIs for AP identities, uplinks, BSSID-to-SSID mappings, and client association lists. This distinguishes actual wireless attachments from devices that merely share a subnet.
+- Device identity: combine DHCP leases, DNS, MACs, vendor identifiers, and Nmap XML service results. Treat hostname and OS guesses as evidence with a source and confidence, not guaranteed identities.
+- History: store snapshots, stable device IDs, last-seen times, provenance, and confidence for each edge; support manual corrections, search/filtering, and change comparisons.
+
+Implementation needs the switch/router/AP brands and models, management addresses, VLAN/subnet scope, and read-only SNMPv3/API access. Credentials should be stored in Windows Credential Manager, never Git or exported reports. A practical next step is one switch-vendor integration plus one Wi-Fi controller integration, then a persistent evidence-backed graph. Traceroute contributes Layer 3 paths; it does not expose transparent Ethernet switches.

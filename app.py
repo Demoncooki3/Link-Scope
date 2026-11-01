@@ -13,6 +13,8 @@ from tkinter import ttk, filedialog, messagebox
 from network_core import inventory, subnet, decode_lldp, cable_assessment, CREATE_NO_WINDOW
 from diagnostics import ping, scan_network, discover, wireless_snapshot
 from topology import build_map, svg_map
+from external_tools import PROFILES, find_nmap, nmap_command, trace_command, run_command
+from pathlib import Path
 
 class App(tk.Tk):
     def __init__(self):
@@ -37,6 +39,8 @@ class App(tk.Tk):
         self.monitor_generation = 0
         self.samples = deque(maxlen=60)
         self.sent = self.received = 0
+        self.external_jobs={}
+        self.external_results={}
         style = ttk.Style(self)
         style.theme_use('clam')
         style.configure('.', font=('Segoe UI', 10),background='#141714',foreground='#edf2e9')
@@ -48,7 +52,7 @@ class App(tk.Tk):
         style.configure('TCombobox',fieldbackground='#232b20',background='#303c29',foreground='#f0f5e9',arrowcolor='#a6ce39')
         style.map('TCombobox',fieldbackground=[('readonly','#232b20')],foreground=[('readonly','#f0f5e9')])
         style.configure('TNotebook',background='#141714',borderwidth=0)
-        style.configure('TNotebook.Tab',padding=(15,12),background='#242b21',foreground='#acb5a2')
+        style.configure('TNotebook.Tab',padding=(7,12),background='#242b21',foreground='#acb5a2')
         style.map('TNotebook.Tab',background=[('selected','#a6ce39')],foreground=[('selected','#17210d')])
         style.configure('Treeview',rowheight=31,background='#1d241b',fieldbackground='#1d241b',foreground='#edf2e9',borderwidth=0)
         style.configure('Treeview.Heading',background='#303c29',foreground='#b7c4a7',padding=8)
@@ -83,6 +87,7 @@ class App(tk.Tk):
         self.build_scanner()
         self.build_cable()
         self.build_network_map()
+        self.build_nmap()
         self.details = self.textbox(local)
         controls = ttk.Frame(lldp)
         controls.pack(fill='x')
@@ -105,7 +110,10 @@ class App(tk.Tk):
         self.target.pack(side='left', padx=10)
         self.test_button = ttk.Button(row,text='Ping + DNS',command=self.run_test)
         self.test_button.pack(side='left')
+        self.trace_button=ttk.Button(row,text='Traceroute',command=self.start_trace); self.trace_button.pack(side='left',padx=8)
+        self.trace_stop=ttk.Button(row,text='Stop trace',command=lambda:self.stop_external('trace'),state='disabled'); self.trace_stop.pack(side='left')
         ttk.Label(tests,text='Tests use the Windows routing table. Ping includes the selected adapter’s IPv4 source when available.').pack(anchor='w',pady=(0,10))
+        ttk.Label(tests,text='Traceroute uses the editable Host or IP field above: IPv4, 30 hops, 1-second probes. It follows system routing, not the adapter selector.\nAsterisks indicate missing replies; traceroute does not reveal Ethernet switch paths.',wraplength=1100).pack(anchor='w')
         self.test_output = self.textbox(tests)
         self.status = tk.StringVar(value='Loading adapters…')
         ttk.Label(outer,textvariable=self.status,foreground='#a6b39a',wraplength=1150).pack(anchor='w')
@@ -115,6 +123,68 @@ class App(tk.Tk):
         self.refresh()
         self.after(15000,self.auto_refresh)
         self.after(1000,self.monitor_tick)
+
+    def build_nmap(self):
+        page=ttk.Frame(self.tabs,padding=14); self.tabs.add(page,text=' Nmap ')
+        row=ttk.Frame(page); row.pack(fill='x')
+        ttk.Label(row,text='Nmap executable:').pack(side='left')
+        self.nmap_path=tk.StringVar(value=find_nmap())
+        ttk.Entry(row,textvariable=self.nmap_path,width=65).pack(side='left',padx=8,fill='x',expand=True)
+        ttk.Button(row,text='Browse',command=self.browse_nmap).pack(side='left')
+        row=ttk.Frame(page); row.pack(fill='x',pady=12)
+        ttk.Label(row,text='Target / CIDR:').pack(side='left')
+        self.nmap_target=ttk.Entry(row,width=28); self.nmap_target.pack(side='left',padx=8)
+        ttk.Button(row,text='Use selected subnet',command=lambda:(self.nmap_target.delete(0,'end'),self.nmap_target.insert(0,self.scan_range_value.get()))).pack(side='left')
+        self.nmap_profile=ttk.Combobox(row,values=PROFILES,state='readonly',width=23); self.nmap_profile.current(0); self.nmap_profile.pack(side='left',padx=8)
+        row=ttk.Frame(page); row.pack(fill='x')
+        self.nmap_start=ttk.Button(row,text='Run Nmap',style='Accent.TButton',command=self.start_nmap); self.nmap_start.pack(side='left')
+        self.nmap_stop=ttk.Button(row,text='Stop',command=lambda:self.stop_external('nmap'),state='disabled'); self.nmap_stop.pack(side='left',padx=8)
+        ttk.Button(row,text='Save output',command=self.save_nmap).pack(side='left')
+        ttk.Label(page,text='Install Nmap for Windows separately from nmap.org, including its Npcap dependency where needed.\nDiscovery: up to 4,096 addresses. TCP/service profiles: up to 256 addresses. Overall limit: 5 minutes.\nNmap follows system routing, not the selected adapter. Results appear when the process finishes or is stopped.',wraplength=1100).pack(anchor='w',pady=12)
+        self.nmap_output=self.textbox(page)
+        self.put(self.nmap_output,'Ready.' if self.nmap_path.get() else 'Nmap was not detected. Install Nmap, then Browse to nmap.exe.')
+
+    def browse_nmap(self):
+        path=filedialog.askopenfilename(title='Select nmap.exe',filetypes=[('Nmap executable','nmap.exe')])
+        if path: self.nmap_path.set(path)
+
+    def start_nmap(self):
+        if 'nmap' in self.external_jobs: return
+        path=self.nmap_path.get().strip().strip('"')
+        if not Path(path).is_file() or Path(path).name.lower()!='nmap.exe':
+            messagebox.showerror('Nmap not found','Install Nmap for Windows and choose its nmap.exe with Browse.'); return
+        try: command=nmap_command(path,self.nmap_target.get(),self.nmap_profile.get())
+        except ValueError as exc: messagebox.showerror('Nmap target',str(exc)); return
+        self.nmap_start.configure(state='disabled'); self.nmap_stop.configure(state='normal')
+        self.start_external('nmap',command,300,self.nmap_output)
+
+    def start_trace(self):
+        if 'trace' in self.external_jobs: return
+        try: command=trace_command(self.target.get())
+        except ValueError as exc: messagebox.showerror('Traceroute target',str(exc)); return
+        self.test_button.configure(state='disabled'); self.trace_button.configure(state='disabled'); self.trace_stop.configure(state='normal')
+        self.start_external('trace',command,110,self.test_output)
+
+    def start_external(self,kind,command,timeout,output):
+        stop=threading.Event(); self.external_jobs[kind]=stop
+        self.external_results[kind]={'state':'running','command':command,'output':''}
+        self.put(output,'Running: '+subprocess.list2cmdline(command)+'\n\nWaiting for results…')
+        def worker():
+            try: result=run_command(command,stop,timeout)
+            except Exception as exc: result={'state':'failed','command':command,'output':str(exc)}
+            result['recorded_at']=datetime.datetime.now().astimezone().isoformat()
+            self.events.put(('external_done',(kind,result)))
+        threading.Thread(target=worker,daemon=False).start()
+
+    def stop_external(self,kind):
+        if kind in self.external_jobs: self.external_jobs[kind].set()
+
+    def save_nmap(self):
+        path=filedialog.asksaveasfilename(defaultextension='.txt',initialfile='LinkScope-nmap.txt',filetypes=[('Text','*.txt')])
+        if path:
+            try:
+                with open(path,'w',encoding='utf-8') as f: f.write(self.nmap_output.get('1.0','end'))
+            except OSError as exc: messagebox.showerror('Save failed',str(exc))
 
     def build_network_map(self):
         page=ttk.Frame(self.tabs,padding=14); self.tabs.add(page,text='  Topology  ')
@@ -488,6 +558,7 @@ class App(tk.Tk):
         a = self.selected()
         source = a['ipv4'][0]['address'] if a and a['ipv4'] else None
         self.test_button.configure(state='disabled'); self.put(self.test_output,f'Testing {target}…')
+        self.trace_button.configure(state='disabled')
         def worker():
             lines = []
             try:
@@ -507,6 +578,7 @@ class App(tk.Tk):
         try:
             report['cable_link']={'adapter':self.selected()['name'] if self.selected() else None,'sampled_at':getattr(self,'inventory_time',None),**cable_assessment(self.selected())}
             report['topology']=self.map_data()
+            report['external_diagnostics']=self.external_results
             with open(path,'w',encoding='utf-8') as f: json.dump(report,f,indent=2)
             self.status.set(f'Report saved: {path}')
         except OSError as exc: messagebox.showerror('Export failed',str(exc))
@@ -538,7 +610,13 @@ class App(tk.Tk):
                     self.capturing = False
                     self.start_button.configure(state='normal'); self.stop_button.configure(state='disabled'); self.lock_adapter()
                     if self.stop_event.is_set(): self.status.set('LLDP listener stopped.')
-                elif kind == 'test': self.put(self.test_output,data); self.test_button.configure(state='normal')
+                elif kind == 'test': self.put(self.test_output,data); self.test_button.configure(state='normal'); self.trace_button.configure(state='normal')
+                elif kind == 'external_done':
+                    job,result=data; self.external_jobs.pop(job,None); self.external_results[job]=result
+                    output=self.nmap_output if job=='nmap' else self.test_output
+                    self.put(output,'Command '+result['state']+'\n'+subprocess.list2cmdline(result['command'])+'\n\n'+result['output'])
+                    if job=='nmap': self.nmap_start.configure(state='normal'); self.nmap_stop.configure(state='disabled')
+                    else: self.test_button.configure(state='normal'); self.trace_button.configure(state='normal'); self.trace_stop.configure(state='disabled')
                 elif kind == 'monitor':
                     self.monitor_busy=False
                     generation,gateway,result=data
@@ -603,6 +681,7 @@ class App(tk.Tk):
         self.after(250,self.poll)
 
     def close(self):
+        for stop in self.external_jobs.values(): stop.set()
         self.stop_event.set(); self.scan_stop.set(); self.destroy()
 
 if __name__ == '__main__':

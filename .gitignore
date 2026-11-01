@@ -8,3 +8,5 @@ dist/
 .env.*
 LinkScope-report*.json
 LinkScope-topology*.svg
+
+LinkScope-nmap*.txt
