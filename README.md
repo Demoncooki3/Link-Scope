@@ -4,13 +4,13 @@ GitHub repository: [Demoncooki3/Link-Scope](https://github.com/Demoncooki3/Link-
 
 ## Download a Windows build
 
-For the executable, open [Releases](https://github.com/Demoncooki3/Link-Scope/releases/latest) and download **linkscope-v1.2.1.exe** under Assets, or use the portable ZIP. Successful builds on main automatically publish both files to a release.
+For the executable, open [Releases](https://github.com/Demoncooki3/Link-Scope/releases/latest) and download **linkscope-v1.2.2.exe** under Assets, or use the portable ZIP. Successful builds on main automatically publish both files to a release.
 
-Open the repository's **Actions** tab, choose a successful **Windows portable build** run, and download the **LinkScope-Windows-x64** artifact. Extract the downloaded artifact and the portable ZIP inside it, then run `linkscope-v1.2.1.exe`. GitHub may require sign-in to download workflow artifacts. Each push runs tests and creates a new build. Older artifacts may expire; build.ps1 can reproduce the application locally.
+Open the repository's **Actions** tab, choose a successful **Windows portable build** run, and download the **LinkScope-Windows-x64** artifact. Extract the downloaded artifact and the portable ZIP inside it, then run `linkscope-v1.2.2.exe`. GitHub may require sign-in to download workflow artifacts. Each push runs tests and creates a new build. Older artifacts may expire; build.ps1 can reproduce the application locally.
 
-The current edition uses a lime-green and charcoal theme. The portable package is **dist/linkscope-v1.2.1-Windows-x64.zip**.
+The current edition uses a lime-green and charcoal theme. The portable package is **dist/linkscope-v1.2.2-Windows-x64.zip**.
 
-Run **dist/release/linkscope-v1.2.1.exe** on Windows 10/11. No Python installation is needed for the executable.
+Run **dist/release/linkscope-v1.2.2.exe** on Windows 10/11. No Python installation is needed for the executable.
 
 Select an adapter to see its link state, speed, MAC, IPv4 addresses, subnet mask, network, broadcast, host range, IPv6 addresses, gateway, and DNS servers. Active adapters with gateways appear first; use the selector to choose the physical port you are testing. Refresh after moving cables or changing configuration.
 
@@ -50,7 +50,7 @@ Neighbor details include switch name, chassis ID, switch port, port description,
 
 Requires Python 3.12 on Windows. Run `python -m pip install -r requirements.txt`, then `python app.py`.
 
-To build the portable executable, run `powershell -ExecutionPolicy Bypass -File build.ps1` from this folder. Output: `dist/release/linkscope-v1.2.1.exe`. Run tests with `python -m unittest -v`.
+To build the portable executable, run `powershell -ExecutionPolicy Bypass -File build.ps1` from this folder. Output: `dist/release/linkscope-v1.2.2.exe`. Run tests with `python -m unittest -v`.
 
 LLDP decoding handles Ethernet and VLAN-tagged Ethernet frames. Packet capture uses Scapy and Npcap. See [Scapy Windows setup](https://scapy.readthedocs.io/en/stable/installation.html) and [Wireshark LLDP reference](https://wiki.wireshark.org/LinkLayerDiscoveryProtocol).
 
@@ -70,7 +70,7 @@ Discovered devices now include hostnames from reverse DNS (PTR records), using t
 
 ## Nmap and traceroute
 
-The Nmap tab locates an existing nmap.exe in PATH or the normal Windows install folders. Click **Install Nmap** to download the official Windows installer and open its setup wizard. Complete the Windows administrator prompt and installer steps yourself; LinkScope automatically detects nmap.exe in standard install folders. Use Browse for custom folders. Nmap and Npcap are not bundled with LinkScope. Enter a single IPv4 address, hostname, or IPv4 CIDR range; choose Host discovery, TCP top 100 ports, or Service detection. Use selected subnet copies the current discovery range. Port profiles use TCP connect scans, skip initial host discovery, and scan up to 256 addresses; host discovery supports up to 4,096. Service detection probes services on detected ports. Results appear when complete or cancelled; Save output exports the text. An overall five-minute limit and per-host timeout bound scans. Nmap results are currently separate from the topology map.
+The Nmap tab locates an existing nmap.exe in PATH or the normal Windows install folders. Click **Install Nmap** to download the official Windows installer and open its setup wizard. Complete the Windows administrator prompt and installer steps yourself; LinkScope automatically detects nmap.exe in standard install folders. Use Browse for custom folders. Nmap and Npcap are not bundled with LinkScope. Enter a single IPv4 address, hostname, or IPv4 CIDR range; choose Host discovery, TCP top 100 ports, or Service detection. Use selected subnet copies the current discovery range. Port profiles use TCP connect scans, skip initial host discovery, and scan up to 256 addresses; host discovery supports up to 4,096. Service detection probes services on detected ports. Results appear when complete or cancelled; Save output exports the text. Overall limits are five minutes for the original profiles and fifteen minutes for Aggressive, with per-host timeouts. Nmap results are currently separate from the topology map.
 
 In Connectivity tests, edit Host or IP and click Traceroute. Windows tracert uses IPv4, numeric hop addresses, 30 maximum hops, and one-second probe timeouts. Stop trace cancels it. Asterisks indicate missing replies, not necessarily a broken route. Both traceroute and Nmap follow the system routing table rather than binding to the adapter selector. Reports include their commands, output, execution state, and timestamps. Command completion does not by itself prove that the destination was reached.
 
@@ -87,3 +87,7 @@ Implementation needs the switch/router/AP brands and models, management addresse
 The in-app installer downloads Nmap 7.993 directly over HTTPS from nmap.org and checks the vendor-published SHA-256 before launch. Cancel download stops the transfer; Check installation allows retry after a cancelled wizard. Nmap/Npcap license choices remain in the official wizard, and the driver is not installed silently. Internet access and Windows installation privileges may be required. Setup is downloaded to a temporary folder, not bundled into the app.
 
 Npcap setup is downloaded directly from npcap.com, checked against a pinned SHA-256 of the Authenticode-verified official installer, and launched through Windows administrator approval. Complete license/options choices yourself. Cancel download stops downloading; Check prerequisites checks for the Npcap library and driver registration. Detection does not prove capture permissions or LLDP reception. Restart LinkScope after setup, and restart Windows if the wizard requests it. Scapy is already bundled. Npcap binaries are not bundled or redistributed with LinkScope; Npcap license terms apply.
+
+### Aggressive Nmap profile
+
+Choose **Aggressive (top 1000)** in the Nmap profile selector. This opt-in profile uses `-A -T4 -Pn --top-ports 1000`: OS detection, service/version detection, default NSE scripts, traceroute, faster timing, and scanning even when hosts do not answer ping. It accepts up to 256 IPv4 addresses, has a three-minute per-host limit, one-minute script timeout, two retries, and a fifteen-minute overall deadline. Stop cancels it. Npcap and administrator privileges may be needed for OS detection and raw-packet features. Default scripts actively probe services and may be intrusive; results and OS guesses are not guaranteed. The existing profiles and default selection remain unchanged. See https://nmap.org/book/man-misc-options.html.

@@ -2,9 +2,18 @@ import subprocess
 import sys
 import threading
 import unittest
-from external_tools import validate_target, trace_command, nmap_command, run_command
+from external_tools import PROFILES, validate_target, trace_command, nmap_command, nmap_timeout, run_command
 
 class ExternalToolsTests(unittest.TestCase):
+    def test_aggressive_profile_is_opt_in(self):
+        command=nmap_command('nmap.exe','192.168.1.1',PROFILES[3])
+        self.assertIn('-A',command); self.assertIn('-T4',command)
+        self.assertEqual(command[command.index('--top-ports')+1],'1000')
+        self.assertEqual(nmap_timeout(PROFILES[3]),900)
+        for profile in PROFILES[:3]:
+            self.assertNotIn('-A',nmap_command('nmap.exe','192.168.1.1',profile))
+            self.assertEqual(nmap_timeout(profile),300)
+        with self.assertRaises(ValueError): nmap_command('nmap.exe','10.0.0.0/16',PROFILES[3])
     def test_targets_and_options(self):
         for value in ('-oN output.txt','host & whoami','host;echo','http://example.com','192.168.1.1 192.168.1.2','::1'):
             with self.assertRaises(ValueError): validate_target(value)

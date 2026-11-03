@@ -13,7 +13,7 @@ from tkinter import ttk, filedialog, messagebox
 from network_core import inventory, subnet, decode_lldp, cable_assessment, CREATE_NO_WINDOW
 from diagnostics import ping, scan_network, discover, wireless_snapshot
 from topology import build_map, svg_map
-from external_tools import PROFILES, find_nmap, nmap_command, trace_command, run_command
+from external_tools import PROFILES, find_nmap, nmap_command, nmap_timeout, trace_command, run_command
 from pathlib import Path
 from nmap_installer import VERSION as NMAP_VERSION, download_installer, launch_installer
 from npcap_installer import download_npcap, launch_npcap, npcap_installed
@@ -181,13 +181,24 @@ class App(tk.Tk):
         self.nmap_target=ttk.Entry(row,width=28); self.nmap_target.pack(side='left',padx=8)
         ttk.Button(row,text='Use selected subnet',command=lambda:(self.nmap_target.delete(0,'end'),self.nmap_target.insert(0,self.scan_range_value.get()))).pack(side='left')
         self.nmap_profile=ttk.Combobox(row,values=PROFILES,state='readonly',width=23); self.nmap_profile.current(0); self.nmap_profile.pack(side='left',padx=8)
+        self.nmap_profile_hint=tk.StringVar(value='Host discovery finds responsive devices without a port scan.')
+        self.nmap_profile.bind('<<ComboboxSelected>>',self.update_nmap_profile)
+        ttk.Label(page,textvariable=self.nmap_profile_hint,foreground='#a6ce39',wraplength=1100).pack(anchor='w',pady=(0,12))
         row=ttk.Frame(page); row.pack(fill='x')
         self.nmap_start=ttk.Button(row,text='Run Nmap',style='Accent.TButton',command=self.start_nmap); self.nmap_start.pack(side='left')
         self.nmap_stop=ttk.Button(row,text='Stop',command=lambda:self.stop_external('nmap'),state='disabled'); self.nmap_stop.pack(side='left',padx=8)
         ttk.Button(row,text='Save output',command=self.save_nmap).pack(side='left')
-        ttk.Label(page,text='Install Nmap downloads verified setup from nmap.org. Complete the setup wizard, including Npcap when needed.\nDiscovery: up to 4,096 addresses. TCP/service profiles: up to 256 addresses. Overall limit: 5 minutes.\nNmap follows system routing, not the selected adapter. Results appear when the process finishes or is stopped.',wraplength=1100).pack(anchor='w',pady=12)
+        ttk.Label(page,text='Install Nmap downloads verified setup from nmap.org. Complete the setup wizard, including Npcap when needed.\nDiscovery: up to 4,096 addresses. Other profiles: up to 256 addresses. Limit: 5 minutes, or 15 minutes for Aggressive.\nNmap follows system routing, not the selected adapter. Results appear when the process finishes or is stopped.',wraplength=1100).pack(anchor='w',pady=12)
         self.nmap_output=self.textbox(page)
         self.put(self.nmap_output,'Ready.' if self.nmap_path.get() else 'Nmap was not detected. Click Install Nmap to download and launch its setup wizard.')
+
+    def update_nmap_profile(self,event=None):
+        descriptions={
+            PROFILES[0]:'Host discovery finds responsive devices without a port scan.',
+            PROFILES[1]:'TCP connect scan of the top 100 ports, including hosts that block ping.',
+            PROFILES[2]:'Top 100 TCP ports plus lightweight service/version detection.',
+            PROFILES[3]:'Aggressive: top 1,000 TCP ports, OS/service detection, default scripts, traceroute, and faster T4 timing.\nMore traffic and active service probes; use on networks you have permission to test. Npcap and administrator access may be required. OS guesses may be incomplete.'}
+        self.nmap_profile_hint.set(descriptions[self.nmap_profile.get()])
 
     def install_nmap(self):
         if self.install_busy or self.install_waiting: return
@@ -246,7 +257,7 @@ class App(tk.Tk):
         try: command=nmap_command(path,self.nmap_target.get(),self.nmap_profile.get())
         except ValueError as exc: messagebox.showerror('Nmap target',str(exc)); return
         self.nmap_start.configure(state='disabled'); self.nmap_stop.configure(state='normal')
-        self.start_external('nmap',command,300,self.nmap_output)
+        self.start_external('nmap',command,nmap_timeout(self.nmap_profile.get()),self.nmap_output)
 
     def start_trace(self):
         if 'trace' in self.external_jobs: return

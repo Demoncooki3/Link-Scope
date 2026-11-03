@@ -8,7 +8,10 @@ import subprocess
 import time
 from network_core import CREATE_NO_WINDOW
 
-PROFILES = ('Host discovery', 'TCP top 100 ports', 'Service detection')
+PROFILES = ('Host discovery', 'TCP top 100 ports', 'Service detection', 'Aggressive (top 1000)')
+
+def nmap_timeout(profile):
+    return 900 if profile==PROFILES[3] else 300
 
 def validate_target(value, allow_network=False, limit=4096):
     value=value.strip()
@@ -38,6 +41,8 @@ def find_nmap():
 def nmap_command(executable,target,profile):
     if profile not in PROFILES: raise ValueError('Select an Nmap profile.')
     target=validate_target(target,True,4096 if profile==PROFILES[0] else 256)
+    if profile==PROFILES[3]:
+        return [executable,'-A','-T4','-Pn','--top-ports','1000','--host-timeout','180s','--script-timeout','60s','--max-retries','2',target]
     flags=['-sn'] if profile==PROFILES[0] else ['-sT','-Pn','--top-ports','100']
     if profile==PROFILES[2]: flags+=['-sV','--version-light']
     return [executable,*flags,'--host-timeout','45s','--max-retries','1',target]
