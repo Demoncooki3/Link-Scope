@@ -4,13 +4,13 @@ GitHub repository: [Demoncooki3/Link-Scope](https://github.com/Demoncooki3/Link-
 
 ## Download a Windows build
 
-For the executable, open [Releases](https://github.com/Demoncooki3/Link-Scope/releases/latest) and download **LinkScope.exe** under Assets, or use the portable ZIP. Successful builds on main automatically publish both files to a release.
+For the executable, open [Releases](https://github.com/Demoncooki3/Link-Scope/releases/latest) and download **linkscope-v1.2.exe** under Assets, or use the portable ZIP. Successful builds on main automatically publish both files to a release.
 
-Open the repository's **Actions** tab, choose a successful **Windows portable build** run, and download the **LinkScope-Windows-x64** artifact. Extract the downloaded artifact and the portable ZIP inside it, then run `LinkScope.exe`. GitHub may require sign-in to download workflow artifacts. Each push runs tests and creates a new build. Older artifacts may expire; build.ps1 can reproduce the application locally.
+Open the repository's **Actions** tab, choose a successful **Windows portable build** run, and download the **LinkScope-Windows-x64** artifact. Extract the downloaded artifact and the portable ZIP inside it, then run `linkscope-v1.2.exe`. GitHub may require sign-in to download workflow artifacts. Each push runs tests and creates a new build. Older artifacts may expire; build.ps1 can reproduce the application locally.
 
-The current edition uses a lime-green and charcoal theme. The portable package is **dist/LinkScope-Hostnames-Windows-x64.zip**.
+The current edition uses a lime-green and charcoal theme. The portable package is **dist/linkscope-v1.2-Windows-x64.zip**.
 
-Run **dist/hostnames/LinkScope.exe** on Windows 10/11. No Python installation is needed for the executable.
+Run **dist/release/linkscope-v1.2.exe** on Windows 10/11. No Python installation is needed for the executable.
 
 Select an adapter to see its link state, speed, MAC, IPv4 addresses, subnet mask, network, broadcast, host range, IPv6 addresses, gateway, and DNS servers. Active adapters with gateways appear first; use the selector to choose the physical port you are testing. Refresh after moving cables or changing configuration.
 
@@ -50,7 +50,7 @@ Neighbor details include switch name, chassis ID, switch port, port description,
 
 Requires Python 3.12 on Windows. Run `python -m pip install -r requirements.txt`, then `python app.py`.
 
-To build the portable executable, run `powershell -ExecutionPolicy Bypass -File build.ps1` from this folder. Output: `dist/hostnames/LinkScope.exe`. Run tests with `python -m unittest -v`.
+To build the portable executable, run `powershell -ExecutionPolicy Bypass -File build.ps1` from this folder. Output: `dist/release/linkscope-v1.2.exe`. Run tests with `python -m unittest -v`.
 
 LLDP decoding handles Ethernet and VLAN-tagged Ethernet frames. Packet capture uses Scapy and Npcap. See [Scapy Windows setup](https://scapy.readthedocs.io/en/stable/installation.html) and [Wireshark LLDP reference](https://wiki.wireshark.org/LinkLayerDiscoveryProtocol).
 

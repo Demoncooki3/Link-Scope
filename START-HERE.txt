@@ -1,7 +1,7 @@
 LINKSCOPE LIVE - PORTABLE WINDOWS APPLICATION
 
 1. Extract the ZIP to a folder on your PC or USB drive.
-2. Double-click LinkScope.exe.
+2. Double-click linkscope-v1.2.exe.
 3. Select the network adapter you want to test.
 
 No Python, command prompt, or app installation is needed.
