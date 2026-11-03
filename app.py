@@ -15,6 +15,7 @@ from diagnostics import ping, scan_network, discover, wireless_snapshot
 from topology import build_map, svg_map
 from external_tools import PROFILES, find_nmap, nmap_command, trace_command, run_command
 from pathlib import Path
+from nmap_installer import VERSION as NMAP_VERSION, download_installer, launch_installer
 
 class App(tk.Tk):
     def __init__(self):
@@ -41,6 +42,9 @@ class App(tk.Tk):
         self.sent = self.received = 0
         self.external_jobs={}
         self.external_results={}
+        self.install_stop=threading.Event()
+        self.install_busy=False
+        self.install_waiting=False
         style = ttk.Style(self)
         style.theme_use('clam')
         style.configure('.', font=('Segoe UI', 10),background='#141714',foreground='#edf2e9')
@@ -131,6 +135,12 @@ class App(tk.Tk):
         self.nmap_path=tk.StringVar(value=find_nmap())
         ttk.Entry(row,textvariable=self.nmap_path,width=65).pack(side='left',padx=8,fill='x',expand=True)
         ttk.Button(row,text='Browse',command=self.browse_nmap).pack(side='left')
+        setup=ttk.Frame(page); setup.pack(fill='x',pady=(10,0))
+        self.nmap_install=ttk.Button(setup,text='Install Nmap',style='Accent.TButton',command=self.install_nmap); self.nmap_install.pack(side='left')
+        self.nmap_cancel=ttk.Button(setup,text='Cancel download',command=self.install_stop.set,state='disabled'); self.nmap_cancel.pack(side='left',padx=8)
+        ttk.Button(setup,text='Check installation',command=self.check_nmap_install).pack(side='left')
+        self.install_status=tk.StringVar(value=f'Official Nmap {NMAP_VERSION} setup • Windows may request administrator approval.')
+        ttk.Label(page,textvariable=self.install_status,wraplength=1100).pack(anchor='w',pady=(8,0))
         row=ttk.Frame(page); row.pack(fill='x',pady=12)
         ttk.Label(row,text='Target / CIDR:').pack(side='left')
         self.nmap_target=ttk.Entry(row,width=28); self.nmap_target.pack(side='left',padx=8)
@@ -140,15 +150,56 @@ class App(tk.Tk):
         self.nmap_start=ttk.Button(row,text='Run Nmap',style='Accent.TButton',command=self.start_nmap); self.nmap_start.pack(side='left')
         self.nmap_stop=ttk.Button(row,text='Stop',command=lambda:self.stop_external('nmap'),state='disabled'); self.nmap_stop.pack(side='left',padx=8)
         ttk.Button(row,text='Save output',command=self.save_nmap).pack(side='left')
-        ttk.Label(page,text='Install Nmap for Windows separately from nmap.org, including its Npcap dependency where needed.\nDiscovery: up to 4,096 addresses. TCP/service profiles: up to 256 addresses. Overall limit: 5 minutes.\nNmap follows system routing, not the selected adapter. Results appear when the process finishes or is stopped.',wraplength=1100).pack(anchor='w',pady=12)
+        ttk.Label(page,text='Install Nmap downloads verified setup from nmap.org. Complete the setup wizard, including Npcap when needed.\nDiscovery: up to 4,096 addresses. TCP/service profiles: up to 256 addresses. Overall limit: 5 minutes.\nNmap follows system routing, not the selected adapter. Results appear when the process finishes or is stopped.',wraplength=1100).pack(anchor='w',pady=12)
         self.nmap_output=self.textbox(page)
-        self.put(self.nmap_output,'Ready.' if self.nmap_path.get() else 'Nmap was not detected. Install Nmap, then Browse to nmap.exe.')
+        self.put(self.nmap_output,'Ready.' if self.nmap_path.get() else 'Nmap was not detected. Click Install Nmap to download and launch its setup wizard.')
+
+    def install_nmap(self):
+        if self.install_busy or self.install_waiting: return
+        if 'nmap' in self.external_jobs:
+            self.install_status.set('Stop the Nmap scan before installing.'); return
+        if find_nmap(): self.check_nmap_install(); return
+        self.install_stop=threading.Event(); stop=self.install_stop
+        self.install_busy=True
+        self.nmap_install.configure(state='disabled'); self.nmap_cancel.configure(state='normal'); self.nmap_start.configure(state='disabled')
+        self.install_status.set(f'Downloading official Nmap {NMAP_VERSION} installer…')
+        def worker():
+            try:
+                path=download_installer(stop,lambda done,total:self.events.put(('install_progress',(done,total))))
+                self.events.put(('install_ready',path))
+            except Exception as exc: self.events.put(('install_error',str(exc)))
+        threading.Thread(target=worker,daemon=True).start()
+
+    def check_nmap_install(self,manual=True):
+        if self.install_busy: return
+        path=find_nmap()
+        if not path:
+            candidate=Path(self.nmap_path.get().strip().strip('"'))
+            if candidate.is_file() and candidate.name.lower()=='nmap.exe': path=str(candidate)
+        if path:
+            self.nmap_path.set(path); self.install_waiting=False
+            self.nmap_install.configure(state='normal'); self.nmap_start.configure(state='normal')
+            self.install_status.set('Nmap detected. Finish any remaining Npcap/setup steps before scanning.')
+        else:
+            if manual:
+                self.install_waiting=False; self.nmap_install.configure(state='normal'); self.nmap_start.configure(state='normal')
+            self.install_status.set('Nmap not detected yet. Finish setup, or Browse to nmap.exe for a custom installation folder.')
+
+    def watch_nmap_install(self):
+        if not self.install_waiting: return
+        self.check_nmap_install(manual=False)
+        if self.install_waiting:
+            if time.monotonic()-self.install_started<900: self.after(2000,self.watch_nmap_install)
+            else:
+                self.install_waiting=False; self.nmap_install.configure(state='normal'); self.nmap_start.configure(state='normal')
+                self.install_status.set('Installation has not been detected. Click Check installation after setup finishes, or Install Nmap to retry.')
 
     def browse_nmap(self):
         path=filedialog.askopenfilename(title='Select nmap.exe',filetypes=[('Nmap executable','nmap.exe')])
         if path: self.nmap_path.set(path)
 
     def start_nmap(self):
+        if self.install_busy or self.install_waiting: return
         if 'nmap' in self.external_jobs: return
         path=self.nmap_path.get().strip().strip('"')
         if not Path(path).is_file() or Path(path).name.lower()!='nmap.exe':
@@ -606,6 +657,23 @@ class App(tk.Tk):
                     self.status.set('Adapter configuration updated at '+datetime.datetime.now().strftime('%H:%M:%S'))
                 elif kind == 'inventory_error': self.inventory_busy=False; self.lock_adapter(); self.status.set(data)
                 elif kind == 'status': self.status.set(data)
+                elif kind == 'install_progress':
+                    done,total=data
+                    self.install_status.set(f'Downloading Nmap: {done/1048576:.1f} MB'+(f' / {total/1048576:.1f} MB' if total else ''))
+                elif kind == 'install_error':
+                    self.install_busy=False; self.nmap_install.configure(state='normal'); self.nmap_cancel.configure(state='disabled'); self.nmap_start.configure(state='normal')
+                    self.install_status.set('Nmap setup: '+data)
+                elif kind == 'install_ready':
+                    self.install_busy=False; self.nmap_cancel.configure(state='disabled')
+                    try:
+                        if self.install_stop.is_set(): raise RuntimeError('Download cancelled; setup was not opened.')
+                        launch_installer(data)
+                        self.install_waiting=True; self.install_started=time.monotonic()
+                        self.install_status.set('Setup opened. Complete the Nmap/Npcap wizard; LinkScope will detect the installation automatically.')
+                        self.after(2000,self.watch_nmap_install)
+                    except Exception as exc:
+                        self.nmap_install.configure(state='normal'); self.nmap_start.configure(state='normal')
+                        self.install_status.set('Setup did not start: '+str(exc))
                 elif kind == 'capture_done':
                     self.capturing = False
                     self.start_button.configure(state='normal'); self.stop_button.configure(state='disabled'); self.lock_adapter()
@@ -681,6 +749,7 @@ class App(tk.Tk):
         self.after(250,self.poll)
 
     def close(self):
+        self.install_stop.set()
         for stop in self.external_jobs.values(): stop.set()
         self.stop_event.set(); self.scan_stop.set(); self.destroy()
 

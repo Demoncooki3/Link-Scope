@@ -18,7 +18,7 @@ INCLUDED FEATURES
 - Cable/link partner check (requires a physical Ethernet adapter)
 - Logical network topology with SVG image export
 - JSON report export
-- Nmap tab: install Nmap separately, then select nmap.exe
+- Nmap tab: click Install Nmap and complete the official setup wizard
 - Editable-destination IPv4 traceroute under Connectivity tests
 
 OPTIONAL DRIVER FOR LLDP
