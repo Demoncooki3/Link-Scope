@@ -15,15 +15,17 @@ MAX_BYTES=150*1024*1024
 class DownloadCancelled(Exception):
     pass
 
-def download_installer(stop, progress):
+def download_installer(stop, progress, *, url=None, checksum=None, filename=None):
+    url=url or URL; checksum=checksum or SHA256
+    filename=filename or f'nmap-{VERSION}-setup.exe'
     directory=Path(tempfile.mkdtemp(prefix='LinkScope-Nmap-'))
     partial=directory/'installer.part'
-    target=directory/f'nmap-{VERSION}-setup.exe'
+    target=directory/filename
     digest=hashlib.sha256(); received=0; started=time.monotonic()
     try:
-        request=urllib.request.Request(URL,headers={'User-Agent':'LinkScope-Nmap-Installer'})
+        request=urllib.request.Request(url,headers={'User-Agent':'LinkScope-Installer'})
         with urllib.request.urlopen(request,timeout=20) as response, partial.open('wb') as out:
-            if response.geturl()!=URL: raise RuntimeError('Unexpected installer download redirect.')
+            if response.geturl()!=url: raise RuntimeError('Unexpected installer download redirect.')
             total=int(response.headers.get('Content-Length','0'))
             if total>MAX_BYTES: raise RuntimeError('Installer exceeds expected download size.')
             while True:
@@ -36,7 +38,7 @@ def download_installer(stop, progress):
                 out.write(chunk); digest.update(chunk); progress(received,total)
         if stop.is_set(): raise DownloadCancelled('Download cancelled.')
         if total and total!=received: raise RuntimeError('Installer download is incomplete.')
-        if digest.hexdigest()!=SHA256: raise RuntimeError('Installer verification failed. It will not be launched.')
+        if digest.hexdigest()!=checksum: raise RuntimeError('Installer verification failed. It will not be launched.')
         partial.replace(target)
         return str(target)
     except Exception:
@@ -44,8 +46,8 @@ def download_installer(stop, progress):
         directory.rmdir()
         raise
 
-def launch_installer(path):
+def launch_installer(path, *, checksum=None):
     # Recheck the exact bytes immediately before requesting the Windows setup UI.
-    if hashlib.sha256(Path(path).read_bytes()).hexdigest()!=SHA256:
+    if hashlib.sha256(Path(path).read_bytes()).hexdigest()!=(checksum or SHA256):
         raise RuntimeError('Installer changed after download; refusing to launch.')
     os.startfile(str(Path(path).resolve()),'runas')

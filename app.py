@@ -16,6 +16,7 @@ from topology import build_map, svg_map
 from external_tools import PROFILES, find_nmap, nmap_command, trace_command, run_command
 from pathlib import Path
 from nmap_installer import VERSION as NMAP_VERSION, download_installer, launch_installer
+from npcap_installer import download_npcap, launch_npcap, npcap_installed
 
 class App(tk.Tk):
     def __init__(self):
@@ -45,6 +46,10 @@ class App(tk.Tk):
         self.install_stop=threading.Event()
         self.install_busy=False
         self.install_waiting=False
+        self.npcap_stop=threading.Event()
+        self.npcap_busy=False
+        self.npcap_checking=False
+        self.npcap_waiting=False
         style = ttk.Style(self)
         style.theme_use('clam')
         style.configure('.', font=('Segoe UI', 10),background='#141714',foreground='#edf2e9')
@@ -99,6 +104,11 @@ class App(tk.Tk):
         self.start_button.pack(side='left')
         self.stop_button = ttk.Button(controls, text='Stop', command=self.stop_capture, state='disabled')
         self.stop_button.pack(side='left', padx=8)
+        self.npcap_install=ttk.Button(controls,text='Install Npcap',style='Accent.TButton',command=self.install_npcap); self.npcap_install.pack(side='left',padx=8)
+        self.npcap_cancel=ttk.Button(controls,text='Cancel download',command=self.npcap_stop.set,state='disabled'); self.npcap_cancel.pack(side='left')
+        ttk.Button(controls,text='Check prerequisites',command=self.check_npcap).pack(side='left',padx=8)
+        self.npcap_status=tk.StringVar(value='LLDP needs Npcap. Install it here, complete setup, then restart LinkScope. Scapy is included.')
+        ttk.Label(lldp,textvariable=self.npcap_status,wraplength=1100).pack(anchor='w',pady=(10,0))
         ttk.Label(lldp, text='Use a wired adapter. Allow 30–120 seconds for switch advertisements.\nLLDP must be enabled on the connected switch; silence does not mean the link is down.', wraplength=950).pack(anchor='w', pady=12)
         self.tree = ttk.Treeview(lldp, columns=('system','port','management','vlan','age'), show='headings', height=7)
         for key, title, width in [('system','Switch / chassis',250),('port','Switch port',180),('management','Management IP',200),('vlan','Advertised PVID',120),('age','Age / TTL',120)]:
@@ -128,6 +138,31 @@ class App(tk.Tk):
         self.after(15000,self.auto_refresh)
         self.after(1000,self.monitor_tick)
 
+    def install_npcap(self):
+        if self.npcap_busy or self.npcap_waiting: return
+        if self.capturing or self.install_busy or self.install_waiting or 'nmap' in self.external_jobs:
+            self.npcap_status.set('Stop packet capture/scanning and finish Nmap setup before installing Npcap.'); return
+        self.npcap_stop=threading.Event(); stop=self.npcap_stop; self.npcap_busy=True
+        self.npcap_install.configure(state='disabled'); self.npcap_cancel.configure(state='normal'); self.start_button.configure(state='disabled')
+        self.npcap_status.set('Downloading official Npcap 1.90 installer…')
+        def worker():
+            try:
+                path=download_npcap(stop,lambda done,total:self.events.put(('npcap_progress',(done,total))))
+                self.events.put(('npcap_ready',path))
+            except Exception as exc: self.events.put(('npcap_error',str(exc)))
+        threading.Thread(target=worker,daemon=True).start()
+
+    def check_npcap(self,manual=True):
+        if self.npcap_busy or self.npcap_checking: return
+        self.npcap_checking=True
+        def worker():
+            try: self.events.put(('npcap_checked',(npcap_installed(),manual,None)))
+            except Exception as exc: self.events.put(('npcap_checked',(False,manual,str(exc))))
+        threading.Thread(target=worker,daemon=True).start()
+
+    def watch_npcap(self):
+        if self.npcap_waiting: self.check_npcap(manual=False)
+
     def build_nmap(self):
         page=ttk.Frame(self.tabs,padding=14); self.tabs.add(page,text=' Nmap ')
         row=ttk.Frame(page); row.pack(fill='x')
@@ -156,6 +191,8 @@ class App(tk.Tk):
 
     def install_nmap(self):
         if self.install_busy or self.install_waiting: return
+        if self.npcap_busy or self.npcap_waiting or self.capturing:
+            self.install_status.set('Stop LLDP capture and finish Npcap setup before installing Nmap.'); return
         if 'nmap' in self.external_jobs:
             self.install_status.set('Stop the Nmap scan before installing.'); return
         if find_nmap(): self.check_nmap_install(); return
@@ -200,6 +237,8 @@ class App(tk.Tk):
 
     def start_nmap(self):
         if self.install_busy or self.install_waiting: return
+        if self.npcap_busy or self.npcap_waiting:
+            self.install_status.set('Finish Npcap setup before scanning.'); return
         if 'nmap' in self.external_jobs: return
         path=self.nmap_path.get().strip().strip('"')
         if not Path(path).is_file() or Path(path).name.lower()!='nmap.exe':
@@ -559,6 +598,8 @@ class App(tk.Tk):
         self.update_cable()
 
     def start_capture(self):
+        if self.npcap_busy or self.npcap_waiting or self.install_busy or self.install_waiting:
+            self.npcap_status.set('Finish prerequisite setup, then restart LinkScope before listening.'); return
         a = self.selected()
         if not a or a['status'] != 'Up':
             messagebox.showinfo('Select a live adapter','Choose an adapter with link status Up.'); return
@@ -657,6 +698,30 @@ class App(tk.Tk):
                     self.status.set('Adapter configuration updated at '+datetime.datetime.now().strftime('%H:%M:%S'))
                 elif kind == 'inventory_error': self.inventory_busy=False; self.lock_adapter(); self.status.set(data)
                 elif kind == 'status': self.status.set(data)
+                elif kind == 'npcap_progress':
+                    done,total=data; self.npcap_status.set(f'Downloading Npcap: {done/1048576:.1f} MB'+(f' / {total/1048576:.1f} MB' if total else ''))
+                elif kind == 'npcap_error':
+                    self.npcap_busy=False; self.npcap_install.configure(state='normal'); self.npcap_cancel.configure(state='disabled'); self.start_button.configure(state='normal')
+                    self.npcap_status.set('Npcap setup: '+data)
+                elif kind == 'npcap_ready':
+                    self.npcap_busy=False; self.npcap_cancel.configure(state='disabled')
+                    try:
+                        if self.npcap_stop.is_set(): raise RuntimeError('Download cancelled; setup was not opened.')
+                        launch_npcap(data)
+                        self.npcap_waiting=True; self.npcap_started=time.monotonic()
+                        self.npcap_status.set('Complete the official Npcap wizard and Windows approval prompts. Restart LinkScope afterward.')
+                        self.after(3000,self.watch_npcap)
+                    except Exception as exc:
+                        self.npcap_install.configure(state='normal'); self.start_button.configure(state='normal'); self.npcap_status.set('Setup did not start: '+str(exc))
+                elif kind == 'npcap_checked':
+                    installed,manual,error=data; self.npcap_checking=False
+                    if installed or manual or (self.npcap_waiting and time.monotonic()-self.npcap_started>900):
+                        self.npcap_waiting=False; self.npcap_install.configure(state='normal')
+                        if not self.capturing: self.start_button.configure(state='normal')
+                    if error: self.npcap_status.set('Prerequisite check failed: '+error)
+                    elif installed: self.npcap_status.set('Npcap library and driver detected. Finish setup and restart LinkScope. Capture may need administrator access; only Start listening confirms capture works.')
+                    else: self.npcap_status.set('Npcap library/driver not detected. Complete setup, or click Install Npcap to retry. Restart Windows if setup requests it.')
+                    if self.npcap_waiting: self.after(3000,self.watch_npcap)
                 elif kind == 'install_progress':
                     done,total=data
                     self.install_status.set(f'Downloading Nmap: {done/1048576:.1f} MB'+(f' / {total/1048576:.1f} MB' if total else ''))
@@ -749,6 +814,7 @@ class App(tk.Tk):
         self.after(250,self.poll)
 
     def close(self):
+        self.npcap_stop.set()
         self.install_stop.set()
         for stop in self.external_jobs.values(): stop.set()
         self.stop_event.set(); self.scan_stop.set(); self.destroy()

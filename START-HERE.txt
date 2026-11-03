@@ -1,7 +1,7 @@
 LINKSCOPE LIVE - PORTABLE WINDOWS APPLICATION
 
 1. Extract the ZIP to a folder on your PC or USB drive.
-2. Double-click linkscope-v1.2.exe.
+2. Double-click linkscope-v1.2.1.exe.
 3. Select the network adapter you want to test.
 
 No Python, command prompt, or app installation is needed.
@@ -22,7 +22,8 @@ INCLUDED FEATURES
 - Editable-destination IPv4 traceroute under Connectivity tests
 
 OPTIONAL DRIVER FOR LLDP
-Install Npcap separately on each PC where you need LLDP capture:
+In LLDP neighbors, click Install Npcap and complete its official wizard.
+You can also install it directly from:
 https://npcap.com/#download
 Restart LinkScope after installing the driver.
 If Npcap was installed with administrator-only access, run LinkScope

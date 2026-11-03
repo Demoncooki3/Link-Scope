@@ -4,13 +4,13 @@ GitHub repository: [Demoncooki3/Link-Scope](https://github.com/Demoncooki3/Link-
 
 ## Download a Windows build
 
-For the executable, open [Releases](https://github.com/Demoncooki3/Link-Scope/releases/latest) and download **linkscope-v1.2.exe** under Assets, or use the portable ZIP. Successful builds on main automatically publish both files to a release.
+For the executable, open [Releases](https://github.com/Demoncooki3/Link-Scope/releases/latest) and download **linkscope-v1.2.1.exe** under Assets, or use the portable ZIP. Successful builds on main automatically publish both files to a release.
 
-Open the repository's **Actions** tab, choose a successful **Windows portable build** run, and download the **LinkScope-Windows-x64** artifact. Extract the downloaded artifact and the portable ZIP inside it, then run `linkscope-v1.2.exe`. GitHub may require sign-in to download workflow artifacts. Each push runs tests and creates a new build. Older artifacts may expire; build.ps1 can reproduce the application locally.
+Open the repository's **Actions** tab, choose a successful **Windows portable build** run, and download the **LinkScope-Windows-x64** artifact. Extract the downloaded artifact and the portable ZIP inside it, then run `linkscope-v1.2.1.exe`. GitHub may require sign-in to download workflow artifacts. Each push runs tests and creates a new build. Older artifacts may expire; build.ps1 can reproduce the application locally.
 
-The current edition uses a lime-green and charcoal theme. The portable package is **dist/linkscope-v1.2-Windows-x64.zip**.
+The current edition uses a lime-green and charcoal theme. The portable package is **dist/linkscope-v1.2.1-Windows-x64.zip**.
 
-Run **dist/release/linkscope-v1.2.exe** on Windows 10/11. No Python installation is needed for the executable.
+Run **dist/release/linkscope-v1.2.1.exe** on Windows 10/11. No Python installation is needed for the executable.
 
 Select an adapter to see its link state, speed, MAC, IPv4 addresses, subnet mask, network, broadcast, host range, IPv6 addresses, gateway, and DNS servers. Active adapters with gateways appear first; use the selector to choose the physical port you are testing. Refresh after moving cables or changing configuration.
 
@@ -36,7 +36,7 @@ ARP responses can come from cache or proxy ARP. Firewalls, sleeping devices, wir
 
 ## LLDP neighbors
 
-Install [Npcap](https://npcap.com/#download) separately, then restart LinkScope. The capture driver is not bundled. Open **LLDP neighbors** and click **Start listening**. If Npcap was installed with administrator-only capture access, run LinkScope as administrator.
+In **LLDP neighbors**, click **Install Npcap** to download and open the official Npcap setup wizard, then restart LinkScope. The capture driver is not bundled. Open **LLDP neighbors** and click **Start listening**. If Npcap was installed with administrator-only capture access, run LinkScope as administrator.
 
 Use wired Ethernet with LLDP enabled on the connected switch. Wait 30–120 seconds. The app passively receives advertisements; it does not enable LLDP on your switch or transmit advertisements. Some Windows NICs, drivers, virtual switches, and switch configurations may prevent LLDP packets from reaching capture software. A working Ethernet link can have no visible LLDP neighbors.
 
@@ -50,7 +50,7 @@ Neighbor details include switch name, chassis ID, switch port, port description,
 
 Requires Python 3.12 on Windows. Run `python -m pip install -r requirements.txt`, then `python app.py`.
 
-To build the portable executable, run `powershell -ExecutionPolicy Bypass -File build.ps1` from this folder. Output: `dist/release/linkscope-v1.2.exe`. Run tests with `python -m unittest -v`.
+To build the portable executable, run `powershell -ExecutionPolicy Bypass -File build.ps1` from this folder. Output: `dist/release/linkscope-v1.2.1.exe`. Run tests with `python -m unittest -v`.
 
 LLDP decoding handles Ethernet and VLAN-tagged Ethernet frames. Packet capture uses Scapy and Npcap. See [Scapy Windows setup](https://scapy.readthedocs.io/en/stable/installation.html) and [Wireshark LLDP reference](https://wiki.wireshark.org/LinkLayerDiscoveryProtocol).
 
@@ -85,3 +85,5 @@ In Connectivity tests, edit Host or IP and click Traceroute. Windows tracert use
 Implementation needs the switch/router/AP brands and models, management addresses, VLAN/subnet scope, and read-only SNMPv3/API access. Credentials should be stored in Windows Credential Manager, never Git or exported reports. A practical next step is one switch-vendor integration plus one Wi-Fi controller integration, then a persistent evidence-backed graph. Traceroute contributes Layer 3 paths; it does not expose transparent Ethernet switches.
 
 The in-app installer downloads Nmap 7.993 directly over HTTPS from nmap.org and checks the vendor-published SHA-256 before launch. Cancel download stops the transfer; Check installation allows retry after a cancelled wizard. Nmap/Npcap license choices remain in the official wizard, and the driver is not installed silently. Internet access and Windows installation privileges may be required. Setup is downloaded to a temporary folder, not bundled into the app.
+
+Npcap setup is downloaded directly from npcap.com, checked against a pinned SHA-256 of the Authenticode-verified official installer, and launched through Windows administrator approval. Complete license/options choices yourself. Cancel download stops downloading; Check prerequisites checks for the Npcap library and driver registration. Detection does not prove capture permissions or LLDP reception. Restart LinkScope after setup, and restart Windows if the wizard requests it. Scapy is already bundled. Npcap binaries are not bundled or redistributed with LinkScope; Npcap license terms apply.
